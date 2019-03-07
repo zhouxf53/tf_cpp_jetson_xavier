@@ -234,3 +234,4 @@ totalMemory: 15.45GiB freeMemory: 1.10GiB
 nvidia@jetson-0423418010444:~/Documents/cpp_project$ ^C
 nvidia@jetson-0423418010444:~/Documents/cpp_project$ 
 
+sudo cp -r tensorflow/contrib/makefile/downloads/absl/absl /usr/local/tensorflow/include/
