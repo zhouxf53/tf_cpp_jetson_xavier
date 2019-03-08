@@ -42,7 +42,7 @@ You can copy the source code to **~/src** folder if you feel necessary
 Side note:
 Although tensorflow 1.13.0 is the official build that supports CUDA 10.0, but I encountered some difficulties when editing the tool chain of it, so I did not proceed and use 1.12.0-rc1 instead.
 
-## modify toolchain
+## Modify toolchain
 If you directly starts to build tensorflow as other linux x86_64 machine, you would encounter an [issue](https://github.com/tensorflow/tensorflow/issues/21852) with missing toolchain for "aarch64". 
 Open **./third_party/gpus/crosstool/CROSSTOOL.tpl.** file with text editor (gedit). In tensorflow directory,
 ```
@@ -58,7 +58,7 @@ default_toolchain {
 ```
 In tensorflow 1.13.0, the format of CROSSTOOL.tpl was changed and so far I have no luck on finding out how to achieve the same objective.
 
-## build third-party dependencies
+## Build third-party dependencies
 ### Addressing protobuf issue
 Here comes with another pit-hole, protobuf version mismatch. In `/{tensorflow_root}/tensorflow/workspace.bzl` file, the protobuf version is defined as **v3.6.0**, as seen by 
 ```
