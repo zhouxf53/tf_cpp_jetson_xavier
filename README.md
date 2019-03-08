@@ -165,6 +165,7 @@ Configuration finished
 ```
 ### Addressing AWS issue
 Yay! Another pit-hole on our road! If you started to build with bazel after configuration, you might have an [issue](https://github.com/tensorflow/serving/issues/832) alert you that `undefined reference to Aws::FileSystem::CreateTempFilePath[abi:cxx11]()'`
+
 The fix is indicated in the link, go to **/home/<user_name>/.cache/bazel/_bazel_<user_name>/<hash>/external/aws/BUILD.bazel**, where <user_name> - user current linux user name, and <hash> is hash like de4a7858eac0c7de37e543fdc903ef12. You may not have this file so far if you have not started the building (I'm not sure). But if you have, in section (cc_library) line 27 replace: `"//conditions:default": []"` with `"//conditions:default": glob(["aws-cpp-sdk-core/source/platform/linux-shared/*.cpp",]),`.
 
 ### Start to build tensorflow C++ API
