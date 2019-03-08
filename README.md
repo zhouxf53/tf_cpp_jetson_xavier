@@ -1,10 +1,102 @@
-# tf_cpp_jetson_xavier
-Build Tensorflow C++ library on Nvidia Jetson Xavier
-$ cd ~/src/tensorflow-1.12.0
-$ ./configure
-WARNING: ignoring http_proxy in environment.
-WARNING: --batch mode is deprecated. Please instead explicitly shut down your Bazel server using the command "bazel shutdown".
-You have bazel 0.15.2- (@non-git) installed.
+# Summary
+Compile Tensorflow 1.12 C++ API from source on a NVIDIA Jetson Xavier system
+
+# Hardware requirement
+- NVIDIA Jetson Xavier Developer Kit
+- Host computer running Ubuntu Linux x64 Version 18.04 or 16.04
+- Internet connection to both system
+
+# Install Jetpack
+If Xavier is freshly out of the box, several developer software need to be installed to it, including CUDA and cuDNN. NVIDIA provided Jetpack as a bundle to the developers. Following the [official installation guide](https://developer.nvidia.com/embedded/downloads#?search=JetPack%204.1.1) provided by NVIDIA to install Jetpack 4.1.1 to it. It requires a host computer and internet connect between them to install the whole package.
+
+run `nvcc --version` in a terminal should tell that the current CUDA version is 10.0.
+
+# Build Bazel
+Bazel is required to build tensorflow from source. However, there is no official binary installer for Bazel on arm64 CPU architecture. So we have to build it from source. Check [tensorflow website](https://www.tensorflow.org/install/source) for the appropriate Bazel version for each individual tensorflow version. For tensorflow 1.12.0, Bazel 0.15.0 was tested by the tensorflow team. Although personally I tested Bazel 0.19.2 and also succeed.
+Get Java
+```
+sudo apt-get install openjdk-8-jdk
+```
+Start download and build bazel 0.19.2 on **~/src** folder
+```
+cd ~/Downloads
+wget https://github.com/bazelbuild/bazel/releases/download/0.15.2/bazel-0.19.2-dist.zip
+mkdir -p ~/src
+cd ~/src
+unzip ~/Downloads/bazel-0.19.2-dist.zip -d bazel-0.19.2-dist
+cd bazel-0.19.2-dist
+./compile.sh
+sudo cp output/bazel /usr/local/bin
+```
+Run `bazel help` to confirm the successful installation of bazel
+
+# Build tensorflow
+## Get tensorflow
+Get tensorflow 1.12.0 from source
+```
+git clone --recursive https://github.com/tensorflow/tensorflow
+cd tensorflow
+git checkout v1.12.0-rc1
+```
+You can copy the source code to **~/src** folder if you feel necessary  
+Side note:
+Although tensorflow 1.13.0 is the official build that supports CUDA 10.0, but I encountered some difficulties when editing the tool chain of it, so I did not proceed and use 1.12.0-rc1 instead.
+
+## modify toolchain
+If you directly starts to build tensorflow as other linux x86_64 machine, you would encounter an [issue](https://github.com/tensorflow/tensorflow/issues/21852) with missing toolchain for "aarch64". 
+Open **./third_party/gpus/crosstool/CROSSTOOL.tpl.** file with text editor (gedit). In tensorflow directory,
+```
+cd ~/tensorflow/third_party/gpus/crosstool
+sudo gedit CROSSTOOL.tpl
+```
+Add the following content after a series of similar `default_toolchain` blocks and save the file
+```
+default_toolchain {
+  cpu: "aarch64"
+  toolchain_identifier: "local_linux"
+}
+```
+In tensorflow 1.13.0, the format of CROSSTOOL.tpl was changed and so far I have no luck on finding out how to achieve the same objective.
+
+## build third-party dependencies
+### Addressing protobuf issue
+Here comes with another pit-hole, protobuf version mismatch. In `/{tensorflow_root}/tensorflow/workspace.bzl` file, the protobuf version is defined as **v3.6.0**, as seen by 
+```
+    PROTOBUF_URLS = [
+        "https://mirror.bazel.build/github.com/google/protobuf/archive/v3.6.0.tar.gz",
+        "https://github.com/google/protobuf/archive/v3.6.0.tar.gz",
+    ]
+    PROTOBUF_SHA256 = "50a5753995b3142627ac55cfd496cebc418a2e575ca0236e29033c67bd5665f4"
+    PROTOBUF_STRIP_PREFIX = "protobuf-3.6.0"
+```
+However, in the shell file we are going to run, protobuf was downloaded as **v3.5.0** (in **/{tensorflow_root}/tensorflow/contrib/makefile/download_dependencies.sh**) 
+```
+# Note: The Protobuf source in `tensorflow/workspace.bzl` in TensorFlow
+# 1.10 branch does not work. `make distclean` fails and blocks the build
+# process. For now we're hardcoding to the version which is used by
+# TensorFlow 1.9.
+PROTOBUF_URL="https://mirror.bazel.build/github.com/google/protobuf/archive/396336eb961b75f03b25824fe86cf6490fb75e3a.tar.gz"
+```
+Edit **download_dependencies.sh** file with the correct 3.6.0 link ("https://mirror.bazel.build/github.com/google/protobuf/archive/v3.6.0.tar.gz") should work. But I discovered this later so I built my own protobuf instead. 
+
+### Start building
+In tensorflow root directory,
+```
+cd tensorflow/contrib/makefile
+./build_all_linux.sh
+```
+The entire process would take several (~3) hours, and packages like protobuf, eigen, and absl would be built from source
+
+## Build tensorflow
+In tensorflow root directory, configure the build options
+```
+./configure
+```
+The following options was used by mine, pay special attention to:
+CUDA version: 10.0
+cuDNN location: /usr/lib/aarch64-linux-gnu
+compute capability: 7.2 for xavier
+```
 Please specify the location of python. [Default is /usr/bin/python]: /usr/bin/python3
    
    
@@ -13,72 +105,55 @@ Found possible Python library paths:
   /usr/lib/python3/dist-packages
 Please input the desired Python library path to use.  Default is [/usr/local/lib/python3.5/dist-packages]
    
-Do you wish to build TensorFlow with jemalloc as malloc support? [Y/n]: 
-jemalloc as malloc support will be enabled for TensorFlow.
+Do you wish to build TensorFlow with jemalloc as malloc support? [Y/n]: n
    
 Do you wish to build TensorFlow with Google Cloud Platform support? [Y/n]: n
-No Google Cloud Platform support will be enabled for TensorFlow.
    
 Do you wish to build TensorFlow with Hadoop File System support? [Y/n]: n
-No Hadoop File System support will be enabled for TensorFlow.
    
 Do you wish to build TensorFlow with Amazon S3 File System support? [Y/n]: n
-No Amazon S3 File System support will be enabled for TensorFlow.
    
 Do you wish to build TensorFlow with Apache Kafka Platform support? [Y/n]: n
-No Apache Kafka Platform support will be enabled for TensorFlow.
    
-Do you wish to build TensorFlow with XLA JIT support? [y/N]: 
-No XLA JIT support will be enabled for TensorFlow.
+Do you wish to build TensorFlow with XLA JIT support? [y/N]: n
    
-Do you wish to build TensorFlow with GDR support? [y/N]: 
-No GDR support will be enabled for TensorFlow.
+Do you wish to build TensorFlow with GDR support? [y/N]: n
    
-Do you wish to build TensorFlow with VERBS support? [y/N]: 
-No VERBS support will be enabled for TensorFlow.
+Do you wish to build TensorFlow with VERBS support? [y/N]: n
    
-Do you wish to build TensorFlow with OpenCL SYCL support? [y/N]: 
-No OpenCL SYCL support will be enabled for TensorFlow.
+Do you wish to build TensorFlow with OpenCL SYCL support? [y/N]: n
    
 Do you wish to build TensorFlow with CUDA support? [y/N]: y
-CUDA support will be enabled for TensorFlow.
    
-Please specify the CUDA SDK version you want to use, e.g. 7.0. [Leave empty to default to CUDA 9.0]: 
-   
+Please specify the CUDA SDK version you want to use, e.g. 7.0. [Leave empty to default to CUDA 9.0]: 10.0
    
 Please specify the location where CUDA 9.0 toolkit is installed. Refer to README.md for more details. [Default is /usr/local/cuda]: 
    
+Please specify the cuDNN version you want to use. [Leave empty to default to cuDNN 7.0]: 7.3.2
    
-Please specify the cuDNN version you want to use. [Leave empty to default to cuDNN 7.0]: 7.3.1
+Please specify the location where cuDNN 7 library is installed. Refer to README.md for more details. [Default is /usr/local/cuda]:
+/usr/lib/aarch64-linux-gnu
    
-Please specify the location where cuDNN 7 library is installed. Refer to README.md for more details. [Default is /usr/local/cuda]:/usr/lib/aarch64-linux-gnu
-   
-   
-Do you wish to build TensorFlow with TensorRT support? [y/N]: y
+Do you wish to build TensorFlow with TensorRT support? [y/N]: n
 TensorRT support will be enabled for TensorFlow.
    
 Please specify the location where TensorRT is installed. [Default is /usr/lib/aarch64-linux-gnu]:
-   
-   
-Please specify the NCCL version you want to use. [Leave empty to default to NCCL 1.3]: 
+
+Please specify the NCCL version you want to use. [Leave empty to default to NCCL 1.3]: 1.3
    
    
 Please specify a list of comma-separated Cuda compute capabilities you want to build with.
 You can find the compute capability of your device at: https://developer.nvidia.com/cuda-gpus.
-Please note that each additional compute capability significantly increases your build time and binary size. [Default is: 3.5,5.2]6.2
+Please note that each additional compute capability significantly increases your build time and binary size. [Default is: 3.5,5.2] 7.2
    
-   
-Do you want to use clang as CUDA compiler? [y/N]: 
+Do you want to use clang as CUDA compiler? [y/N]: n
 nvcc will be used as CUDA compiler.
    
 Please specify which gcc should be used by nvcc as the host compiler. [Default is /usr/bin/gcc]: 
-   
-   
-Do you wish to build TensorFlow with MPI support? [y/N]: 
-No MPI support will be enabled for TensorFlow.
+ 
+Do you wish to build TensorFlow with MPI support? [y/N]: n
    
 Please specify optimization flags to use during compilation when bazel option "--config=opt" is specified [Default is -march=native]: 
-   
    
 Would you like to interactively configure ./WORKSPACE for Android builds? [y/N]: 
 Not configuring the WORKSPACE for Android builds.
@@ -87,57 +162,33 @@ Preconfigured Bazel build configs. You can use any of the below by adding "--con
 	--config=mkl         	# Build with MKL support.
 	--config=monolithic  	# Config for mostly static monolithic build.
 Configuration finished
-#download patch
-git apply patch
-bazel build --config=opt --config=cuda --local_resources 8192,2.0,1.0  //tensorflow:libtensorflow_cc.so
+```
+### Addressing AWS issue
+Yay! Another pit-hole on our road! If you started to build with bazel after configuration, you might have an [issue](https://github.com/tensorflow/serving/issues/832) alert you that `undefined reference to Aws::FileSystem::CreateTempFilePath[abi:cxx11]()'`
+The fix is indicated in the link, go to **/home/<user_name>/.cache/bazel/_bazel_<user_name>/<hash>/external/aws/BUILD.bazel**, where <user_name> - user current linux user name, and <hash> is hash like de4a7858eac0c7de37e543fdc903ef12. You may not have this file so far if you have not started the building (I'm not sure). But if you have, in section (cc_library) line 27 replace: `"//conditions:default": []"` with `"//conditions:default": glob(["aws-cpp-sdk-core/source/platform/linux-shared/*.cpp",]),`.
 
-### 方式一
+### Start to build tensorflow C++ API
+In tensorflow root directory
+```
+bazel build //tensorflow:libtensorflow_cc.so
+```
+The while process took 23000s (~8 hours) in my Xavier.
+By the way, if you want to use C API, build **tensorflow/libtensorflow.so**, if C++ API, use **tensorflow/libtensorflow_cc.so**.
+If you need python wheel, you can build **tensorflow/tools/pip_package:build_pip_package**, but there is already an official one on NVIDIA forum [tensorflow-gpu 1.13.0 for xavier](https://devtalk.nvidia.com/default/topic/1042125/jetson-agx-xavier/official-tensorflow-for-jetson-agx-xavier/).
 
-#### 安装Bazel
-
-1. 安装JDK8：`sudo apt install openjdk-8-jdk`
-
-2. 添加Bazel分发源地址：
-
-   ```
-   echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
-   curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
-   ```
-
-3. 安装Bazel：`sudo apt update && sudo apt install bazel`
-
-4. 更新Bazel：`sudo apt upgrade bazel`
-
-build bazel
-#### 配置第三方依赖
-
-1. 从GitHub上下载TensorFlow源码：`git clone --recursive https://github.com/tensorflow/tensorflow`
-2. 进入目录：`cd tensorflow/contrib/makefile`
-3. 执行文件：`./build_all_linux.sh`
-
-#### 编译TensorFlow
-
-1. 进入TensorFlow根目录：`cd tensorflow`
-2. 配置TensorFlow：`./configure`
-3. 使用Bazel编译C++ API的库：`bazel build //tensorflow:libtensorflow_cc.so`
-
-#### 安装
-
-1. 建立文件夹
-
+### Install tensorflow library
+make directory
 ```
 sudo mkdir /usr/local/tensorflow
-```
-
-2. 拷贝头文件
-
-```
 sudo mkdir /usr/local/tensorflow/include
+```
+copy the header files
+```
 sudo cp -r tensorflow/contrib/makefile/downloads/eigen/Eigen /usr/local/tensorflow/include/
 sudo cp -r tensorflow/contrib/makefile/downloads/eigen/unsupported /usr/local/tensorflow/include/
 sudo cp -r tensorflow/contrib/makefile/downloads/absl/absl /usr/local/tensorflow/include/
-
-# sudo cp -r tensorflow/contrib/makefile/gen/protobuf/include/google /usr/local/tensorflow/include/
+# if your protobuf is 3.6.0 by changing the download file
+sudo cp -r tensorflow/contrib/makefile/gen/protobuf/include/google /usr/local/tensorflow/include/
 sudo cp tensorflow/contrib/makefile/downloads/nsync/public/* /usr/local/tensorflow/include/
 sudo cp -r bazel-genfiles/tensorflow /usr/local/tensorflow/include/
 sudo cp -r tensorflow/cc /usr/local/tensorflow/include/tensorflow
@@ -145,16 +196,112 @@ sudo cp -r tensorflow/core /usr/local/tensorflow/include/tensorflow
 sudo mkdir /usr/local/tensorflow/include/third_party
 sudo cp -r third_party/eigen3 /usr/local/tensorflow/include/third_party/
 ```
-
-3. 拷贝库文件
-
+Copy library files
 ```
 sudo mkdir /usr/local/tensorflow/lib
 sudo cp bazel-bin/tensorflow/libtensorflow_*.so /usr/local/tensorflow/lib
 ```
+### Testing tensorflow C++ API
+Try a sample C++ file like main.cc provided by [source](https://github.com/hemajun815/tutorial/blob/master/tensorflow/training-a-DNN-using-only-tensorflow-cc.md)
+```
+#include "tensorflow/cc/client/client_session.h"
+#include "tensorflow/cc/ops/standard_ops.h"
+#include "tensorflow/cc/framework/gradients.h"
 
+int main()
+{
+    // benchmark
+    auto benchmark_w = 2.0, benchmark_b = 0.5;
 
+    // data
+    auto nof_samples = 100;
+    struct Sample 
+    {
+        float sample;
+        float label;
+    };
+    std::vector<struct Sample> dataset;
+    std::srand((unsigned)std::time(NULL));
+    for (int i = 0; i < nof_samples; i++)
+    {
+        float sample = std::rand() / float(RAND_MAX) - 0.5;
+        float label = benchmark_w * sample + benchmark_b + std::rand() / float(RAND_MAX) * 0.01;
+        dataset.push_back({sample, label});
+    }
 
+    // model
+    tensorflow::Scope root = tensorflow::Scope::NewRootScope();
+    auto x = tensorflow::ops::Placeholder(root, tensorflow::DataType::DT_FLOAT);
+    auto y = tensorflow::ops::Placeholder(root, tensorflow::DataType::DT_FLOAT);
+    auto w = tensorflow::ops::Variable(root, {1, 1}, tensorflow::DataType::DT_FLOAT);
+    auto assign_w = tensorflow::ops::Assign(root, w, tensorflow::ops::RandomNormal(root, {1, 1}, tensorflow::DataType::DT_FLOAT));
+    auto b = tensorflow::ops::Variable(root, {1, 1}, tensorflow::DataType::DT_FLOAT);
+    auto assign_b = tensorflow::ops::Assign(root, b, {{0.0f}});
+    auto y_ = tensorflow::ops::Add(root, tensorflow::ops::MatMul(root, x, w), b);
+    auto loss = tensorflow::ops::L2Loss(root, tensorflow::ops::Sub(root, y_, y));
+    std::vector<tensorflow::Output> grad_outputs;
+    TF_CHECK_OK(AddSymbolicGradients(root, {loss}, {w, b}, &grad_outputs));
+    auto learn_rate = tensorflow::ops::Const(root, 0.01f, {});
+    auto apply_w = tensorflow::ops::ApplyGradientDescent(root, w, learn_rate, {grad_outputs[0]});
+    auto apply_b = tensorflow::ops::ApplyGradientDescent(root, b, learn_rate, {grad_outputs[1]});
+
+    // train
+    tensorflow::ClientSession sess(root);
+    sess.Run({assign_w, assign_b}, nullptr);
+    std::vector<tensorflow::Tensor> outputs;
+    timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (int epoch = 1; epoch <= 64; epoch++)
+    {
+        std::random_shuffle(dataset.begin(), dataset.end());
+        for (int i = 0; i < nof_samples; i++)
+        {
+            TF_CHECK_OK(sess.Run({{x, {{dataset[i].sample}}}, {y, {{dataset[i].label}}}}, {w, b, loss, apply_w, apply_b}, &outputs));
+        }
+        LOG(INFO) << "epoch " << epoch << ": w=" << outputs[0].matrix<float>() << " b=" << outputs[1].matrix<float>() << " loss=" << outputs[2].scalar<float>();
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    LOG(INFO) << "elapsed time： " << t1.tv_sec - t0.tv_sec + (t1.tv_nsec - t0.tv_nsec) * 1.0 / 1000000000 << "s";
+    return 0;
+}
+```
+or official example.cc [source](https://www.tensorflow.org/guide/extend/cc)
+```
+// tensorflow/cc/example/example.cc
+
+#include "tensorflow/cc/client/client_session.h"
+#include "tensorflow/cc/ops/standard_ops.h"
+#include "tensorflow/core/framework/tensor.h"
+
+int main() {
+  using namespace tensorflow;
+  using namespace tensorflow::ops;
+  Scope root = Scope::NewRootScope();
+  // Matrix A = [3 2; -1 0]
+  auto A = Const(root, { {3.f, 2.f}, {-1.f, 0.f} });
+  // Vector b = [3 5]
+  auto b = Const(root, { {3.f, 5.f} });
+  // v = Ab^T
+  auto v = MatMul(root.WithOpName("v"), A, b, MatMul::TransposeB(true));
+  std::vector<Tensor> outputs;
+  ClientSession session(root);
+  // Run and fetch v
+  TF_CHECK_OK(session.Run({v}, &outputs));
+  // Expect outputs[0] == [19; -3]
+  LOG(INFO) << outputs[0].matrix<float>();
+  return 0;
+}
+```
+Both files can be compiled from any locations:
+```
+g++ -std=c++11 ./main.cc -ltensorflow_framework -ltensorflow_cc -o tfcc \
+-I/usr/local/tensorflow/include/ \
+-L/usr/local/tensorflow/lib/ \
+-Wl,-rpath=/usr/local/tensorflow/lib/
+```
+
+Here is my example output of aforementioned **main.cc**
+```
 nvidia@jetson-0423418010444:~/Documents/cpp_project$ ./tfcc
 2019-03-07 16:41:17.469494: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:931] ARM64 does not support NUMA - returning NUMA node zero
 2019-03-07 16:41:17.469989: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1432] Found device 0 with properties: 
@@ -233,5 +380,4 @@ totalMemory: 15.45GiB freeMemory: 1.10GiB
 2019-03-07 16:41:35.595074: I ./main.cc:58] elapsed time： 16.2057s
 nvidia@jetson-0423418010444:~/Documents/cpp_project$ ^C
 nvidia@jetson-0423418010444:~/Documents/cpp_project$ 
-
-sudo cp -r tensorflow/contrib/makefile/downloads/absl/absl /usr/local/tensorflow/include/
+```
