@@ -6,12 +6,12 @@ Compile Tensorflow 1.12 C++ API from source on a NVIDIA Jetson Xavier system
 - Host computer running Ubuntu Linux x64 Version 18.04 or 16.04
 - Internet connection to both system
 
-# Install Jetpack
-If Xavier is freshly out of the box, several developer software need to be installed to it, including CUDA and cuDNN. NVIDIA provided Jetpack as a bundle to the developers. Following the [official installation guide](https://developer.nvidia.com/embedded/downloads#?search=JetPack%204.1.1) provided by NVIDIA to install Jetpack 4.1.1 to it. It requires a host computer and internet connect between them to install the whole package.
+# 1. Install Jetpack
+If Xavier is freshly out of the box, several developer software need to be installed to it, including CUDA and cuDNN. NVIDIA provided Jetpack as a bundle to the developers. Following the [official installation guide](https://developer.nvidia.com/embedded/downloads#?search=JetPack%204.1.1) provided by NVIDIA to install Jetpack 4.1.1 to it. It requires a host computer along with a internet connection between them to install the whole package.
 
 run `nvcc --version` in a terminal should tell that the current CUDA version is 10.0.
 
-# Build Bazel
+# 2. Build Bazel
 Bazel is required to build tensorflow from source. However, there is no official binary installer for Bazel on arm64 CPU architecture. So we have to build it from source. Check [tensorflow website](https://www.tensorflow.org/install/source) for the appropriate Bazel version for each individual tensorflow version. For tensorflow 1.12.0, Bazel 0.15.0 was tested by the tensorflow team. Although personally I tested Bazel 0.19.2 and also succeed.
 Get Java
 ```
@@ -30,8 +30,8 @@ sudo cp output/bazel /usr/local/bin
 ```
 Run `bazel help` to confirm the successful installation of bazel
 
-# Build tensorflow
-## Get tensorflow
+# 3. Build tensorflow
+## 3.1 Get tensorflow
 Get tensorflow 1.12.0 from source
 ```
 git clone --recursive https://github.com/tensorflow/tensorflow
@@ -42,7 +42,7 @@ You can copy the source code to **~/src** folder if you feel necessary
 Side note:
 Although tensorflow 1.13.0 is the official build that supports CUDA 10.0, but I encountered some difficulties when editing the tool chain of it, so I did not proceed and use 1.12.0-rc1 instead.
 
-## Modify toolchain
+## 3.2 Modify toolchain
 If you directly starts to build tensorflow as other linux x86_64 machine, you would encounter an [issue](https://github.com/tensorflow/tensorflow/issues/21852) with missing toolchain for "aarch64". 
 Open **./third_party/gpus/crosstool/CROSSTOOL.tpl.** file with text editor (gedit). In tensorflow directory,
 ```
@@ -58,7 +58,7 @@ default_toolchain {
 ```
 In tensorflow 1.13.0, the format of CROSSTOOL.tpl was changed and so far I have no luck on finding out how to achieve the same objective.
 
-## Build third-party dependencies
+## 3.3 Build third-party dependencies
 ### Addressing protobuf issue
 Here comes with another pit-hole, protobuf version mismatch. In `/{tensorflow_root}/tensorflow/workspace.bzl` file, the protobuf version is defined as **v3.6.0**, as seen by 
 ```
@@ -87,7 +87,7 @@ cd tensorflow/contrib/makefile
 ```
 The entire process would take several (~3) hours, and packages like protobuf, eigen, and absl would be built from source
 
-## Build tensorflow
+## 3.4 Build tensorflow from root
 In tensorflow root directory, configure the build options
 ```
 ./configure
@@ -202,7 +202,7 @@ Copy library files
 sudo mkdir /usr/local/tensorflow/lib
 sudo cp bazel-bin/tensorflow/libtensorflow_*.so /usr/local/tensorflow/lib
 ```
-### Testing tensorflow C++ API
+## 4. Testing tensorflow C++ API
 Try a sample C++ file like main.cc provided by [source](https://github.com/hemajun815/tutorial/blob/master/tensorflow/training-a-DNN-using-only-tensorflow-cc.md)
 ```
 #include "tensorflow/cc/client/client_session.h"
