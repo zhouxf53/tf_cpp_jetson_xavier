@@ -79,7 +79,7 @@ PROTOBUF_URL="https://mirror.bazel.build/github.com/google/protobuf/archive/3963
 ```
 Edit **download_dependencies.sh** file with the correct 3.6.0 link ("https://mirror.bazel.build/github.com/google/protobuf/archive/v3.6.0.tar.gz") should work. But I discovered this later so I built my own protobuf instead. 
 
-### Start building
+### Compile from source
 In tensorflow root directory,
 ```
 cd tensorflow/contrib/makefile
