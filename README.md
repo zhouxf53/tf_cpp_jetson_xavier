@@ -177,7 +177,7 @@ The while process took 23000s (~8 hours) in my Xavier.
 By the way, if you want to use C API, build **tensorflow/libtensorflow.so**, if C++ API, use **tensorflow/libtensorflow_cc.so**.
 If you need python wheel, you can build **tensorflow/tools/pip_package:build_pip_package**, but there is already an official one on NVIDIA forum [tensorflow-gpu 1.13.0 for xavier](https://devtalk.nvidia.com/default/topic/1042125/jetson-agx-xavier/official-tensorflow-for-jetson-agx-xavier/).
 
-### Install tensorflow library
+## 3.5 Install tensorflow library
 make directory
 ```
 sudo mkdir /usr/local/tensorflow
